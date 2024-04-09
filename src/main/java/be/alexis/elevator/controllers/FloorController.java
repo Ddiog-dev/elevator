@@ -4,7 +4,6 @@ import be.alexis.elevator.models.Direction;
 import be.alexis.elevator.models.Elevator;
 import be.alexis.elevator.services.ElevatorService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,7 +26,7 @@ public class FloorController {
     public String callElevator(@RequestParam int floor, @RequestParam int elevatorId) {
         Optional<Elevator> elevator = elevatorService.getElevator(elevatorId);
         elevator.map(elevator1 -> {
-                    elevatorService.selectFloor(elevator1, floor);
+                    elevatorService.selectFloorForUser(elevator1, floor);
                     return elevator1;
                 })
                 .orElseThrow(IllegalArgumentException::new);

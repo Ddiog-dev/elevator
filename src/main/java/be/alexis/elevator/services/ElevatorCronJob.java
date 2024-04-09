@@ -16,6 +16,6 @@ public class ElevatorCronJob {
 
     @Scheduled(fixedDelay = 3000) // trigger every 2 seconds
     public void runElevators(){
-        elevatorService.workTheElevators();
+        elevatorService.moveElevatorsToNextFloor();
     }
 }

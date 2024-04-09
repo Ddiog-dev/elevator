@@ -23,5 +23,7 @@ public class Elevator {
 
     private int moveToFloor;
 
+    private boolean waitingForFloorInput;
+
     private List<User> users;
 }
