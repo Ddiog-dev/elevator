@@ -25,5 +25,7 @@ public class Elevator {
 
     private boolean waitingForFloorInput;
 
+    private boolean inPriority;
+
     private List<User> users;
 }

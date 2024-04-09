@@ -16,9 +16,9 @@ public class ElevatorService {
     private final int MAX_FLOOR = 50;
 
     Elevator[] elevators = new Elevator[]{
-            new Elevator(0, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>()),
-            new Elevator(1, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>()),
-            new Elevator(2, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>()),
+            new Elevator(0, Direction.STATIONARY, 0, 0, 0, false, false, new ArrayList<>()),
+//            new Elevator(1, Direction.STATIONARY, 0, 0, 0, false,false, new ArrayList<>()),
+//            new Elevator(2, Direction.STATIONARY, 0, 0, 0, false, false, new ArrayList<>()),
     };
 
     List<ElevatorCall> waitingUsers = new ArrayList<>();
@@ -29,30 +29,44 @@ public class ElevatorService {
      * @param floor
      * @param direction
      */
-    public void callElevator(int floor, Direction direction) {
+    public int callElevator(int floor, Direction direction, boolean priority) {
         if (floor == 0 && direction.equals(Direction.DOWN)) {
             System.err.println("user Cant go down when at bottom floor");
-            return;
+            return -1;
         }
 
         if (floor == MAX_FLOOR && direction.equals(Direction.UP)) {
             System.err.println("user Cant go up when at top floor");
-            return;
+            return -1;
+        }
+        Optional<Elevator> elevator;
+        if (priority) { // if we have priority
+            elevator = Arrays.stream(elevators) // find first that is stationary
+                    .filter(elevatorElement -> elevatorElement.getDirection().equals(Direction.STATIONARY))
+                    .findFirst();
+            if (elevator.isEmpty()) { // if there are no stationary, find first
+                elevator = Arrays.stream(elevators).findFirst();
+            }
+        } else {
+            elevator = Arrays.stream(elevators)
+                    .filter(elevatorElement -> elevatorAvailable(elevatorElement, floor, direction))
+                    .findFirst();
         }
 
-        Optional<Elevator> elevator = Arrays.stream(elevators)
-                .filter(elevatorElement -> elevatorAvailable(elevatorElement, floor, direction))
-                .findFirst();
-        elevator
+        return elevator
                 .map(elevator1 -> {
-                    if (elevator1.getDirection().equals(Direction.STATIONARY)) {
-                        moveToFloor(elevator1, floor);
+                    if ((elevator1.getDirection().equals(Direction.STATIONARY) && !elevator1.isWaitingForFloorInput()) || priority) {
+                        moveToFloor(elevator1, floor, priority);
                     }
                     waitingUsers.add(new ElevatorCall(floor, direction));
                     System.out.println("User waiting elevator " + elevator1.getElevatorId() + " at floor " + floor + " to go " + direction.name());
-                    return elevator1;
+                    return elevator1.getElevatorId();
                 })
-                .orElseThrow(() -> new IllegalArgumentException("No elevators available"));
+                .orElseGet(() -> {
+                    waitingUsers.add(new ElevatorCall(floor, direction));
+                    System.out.println("User waiting elevator at floor " + floor + " to go " + direction.name());
+                    return -1;
+                });
     }
 
 
@@ -62,22 +76,18 @@ public class ElevatorService {
      * @param elevator
      * @param destinationFloor
      */
-    public void selectFloorForUser(Elevator elevator, int destinationFloor) {
+    public void selectFloorForUser(Elevator elevator, int destinationFloor, boolean priority) {
         elevator.getUsers().add(new User(destinationFloor));
         System.out.println("User enters elevator " + elevator.getElevatorId());
         int newDestinationFloor = elevator.getDirection().equals(Direction.UP) ?
                 Collections.max(elevator.getUsers()).getDestinationFloor() : // if we go up, we take the highest floor as destination
                 Collections.min(elevator.getUsers()).getDestinationFloor(); // otherwise we take the min (if stationary there is probably only one user
-        moveToFloor(elevator, newDestinationFloor);
+        moveToFloor(elevator, newDestinationFloor, priority);
     }
 
 
     public void moveElevatorsToNextFloor() {
-        Arrays.stream(elevators).forEach(elevator -> {
-            if (!elevator.getDirection().equals(Direction.STATIONARY) && !elevator.isWaitingForFloorInput()) {
-                movingElevator(elevator);
-            }
-        });
+        Arrays.stream(elevators).forEach(this::movingElevator);
     }
 
     /**
@@ -86,13 +96,23 @@ public class ElevatorService {
      * @param elevator
      * @param destinationFloor
      */
-    private void moveToFloor(Elevator elevator, int destinationFloor) {
-        elevator.setDirection(destinationFloor >= elevator.getCurrentPosition() ? Direction.UP : Direction.DOWN);
-        if (elevator.getDirection().equals(Direction.UP)) {
-            elevator.setMoveToFloor(Math.max(destinationFloor, elevator.getMoveToFloor()));
+    private void moveToFloor(Elevator elevator, int destinationFloor, boolean priority) {
+        if (destinationFloor == elevator.getCurrentPosition()) {
+            elevator.setDirection(Direction.STATIONARY);
         } else {
-            elevator.setMoveToFloor(Math.min(destinationFloor, elevator.getMoveToFloor()));
+            elevator.setDirection(destinationFloor > elevator.getCurrentPosition() ? Direction.UP : Direction.DOWN);
         }
+
+        if (priority) {
+            elevator.setMoveToFloor(destinationFloor);
+        } else {
+            if (elevator.getDirection().equals(Direction.UP)) {
+                elevator.setMoveToFloor(Math.max(destinationFloor, elevator.getMoveToFloor()));
+            } else {
+                elevator.setMoveToFloor(Math.min(destinationFloor, elevator.getMoveToFloor()));
+            }
+        }
+        elevator.setInPriority(priority);
         elevator.setWaitingForFloorInput(false);
     }
 
@@ -106,15 +126,18 @@ public class ElevatorService {
      * @param elevator
      */
     private void movingElevator(Elevator elevator) {
+
         /* MOVE ELEVATOR TO NEXT FLOOR */
-        if (elevator.getDirection().equals(Direction.UP)) {
+        if (elevator.getDirection().equals(Direction.UP) && !elevator.isWaitingForFloorInput()) {
             elevator.setCurrentPosition(elevator.getCurrentPosition() + 1);
-        } else if (elevator.getDirection().equals(Direction.DOWN)) {
+        } else if (elevator.getDirection().equals(Direction.DOWN) && !elevator.isWaitingForFloorInput()) {
             elevator.setCurrentPosition(elevator.getCurrentPosition() - 1);
         }
+        if(!elevator.getDirection().equals(Direction.STATIONARY) && !elevator.isWaitingForFloorInput()){
+            System.out.println("Elevator " + elevator.getElevatorId() + " is at floor " + elevator.getCurrentPosition() + " going to " + elevator.getMoveToFloor() + "with priority " + elevator.isInPriority());
+        }
         /* FIND USERS LEAVING AT THIS FLOOR*/
-        System.out.println("Elevator " + elevator.getElevatorId() + " is at floor " + elevator.getCurrentPosition() + " going to " + elevator.getMoveToFloor());
-        List<User> users = elevator.getUsers().stream().filter(user -> user.getDestinationFloor() == elevator.getCurrentPosition()).collect(Collectors.toList());
+       List<User> users = elevator.getUsers().stream().filter(user -> user.getDestinationFloor() == elevator.getCurrentPosition()).collect(Collectors.toList());
         if (!users.isEmpty()) {
             elevator.getUsers().removeAll(users);
             System.out.println(users.size() + " users left the elevator, currently " + elevator.getUsers().size() + " users in the elevator");
@@ -123,7 +146,7 @@ public class ElevatorService {
         /* STOP FOR WAITING USER */
         List<ElevatorCall> calls = waitingUsers.stream()
                 .filter(user -> user.getFloor() == elevator.getCurrentPosition() && elevatorAvailable(elevator, user.getFloor(), user.getDirection())).collect(Collectors.toList());
-        if (!calls.isEmpty()){
+        if (!calls.isEmpty() && !elevator.isWaitingForFloorInput()) {
             elevator.setWaitingForFloorInput(true); // Wait input from new user
             System.out.println("Waiting for user floor  choice");
             waitingUsers.removeAll(calls);
@@ -132,8 +155,9 @@ public class ElevatorService {
         /* IF WE REACH DIRECTION FLOOR, ELEVATOR IS STATIONARY */
         if (elevator.getMoveToFloor() == elevator.getCurrentPosition() && !elevator.isWaitingForFloorInput()) {
             elevator.setDirection(Direction.STATIONARY);
+            elevator.setInPriority(false);
             waitingUsers.stream().findFirst().map(elevatorCall -> {
-                moveToFloor(elevator, elevatorCall.getFloor());
+                moveToFloor(elevator, elevatorCall.getFloor(), false);
                 return true;
             });
         }
@@ -148,6 +172,14 @@ public class ElevatorService {
      * @return true if the elevator is passing by the user and going the same way or is stationary, false otherwise
      */
     private boolean elevatorAvailable(Elevator elevatorElement, int floor, Direction direction) {
+        if (elevatorElement.isInPriority() && elevatorElement.getMoveToFloor() != floor) {
+            return false;
+        }
+
+        if (elevatorElement.getUsers().size() == 2) {
+            return false; // maximum 2 people inside
+        }
+
         if (elevatorElement.getDirection().equals(Direction.STATIONARY) || elevatorElement.getMoveToFloor() == floor) {
             return true;
         }
@@ -157,9 +189,6 @@ public class ElevatorService {
             return elevatorElement.getDirection().equals(direction); // elevator is called at its floor and going the same way
         }
 
-        return floorDifference > 0 ? (direction.equals(Direction.UP)): direction.equals(Direction.DOWN);
+        return floorDifference > 0 ? (direction.equals(Direction.UP)) : direction.equals(Direction.DOWN);
     }
-
-
-
 }
