@@ -2,26 +2,42 @@ package be.alexis.elevator.services;
 
 import be.alexis.elevator.models.Direction;
 import be.alexis.elevator.models.Elevator;
+import be.alexis.elevator.models.ElevatorCall;
 import be.alexis.elevator.models.User;
 import org.springframework.stereotype.Service;
 
-import javax.swing.text.html.Option;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 @Service
 public class ElevatorService {
 
-    private final int MOVING_TIME = 1;
+    private final int MAX_FLOOR = 50;
+
+    private ExecutorService executor = Executors.newFixedThreadPool(3);
 
     Elevator[] elevators = new Elevator[]{new Elevator(0, Direction.STATIONARY, 0, 0, 0, new ArrayList<>())};
 
+    List<ElevatorCall> waitingUsers = new ArrayList<>();
 
+    /**
+     * User calls the elevator to his floor and provides a direction
+     *
+     * @param floor
+     * @param direction
+     */
     public void callElevator(int floor, Direction direction) {
+        if (floor == 0 && direction.equals(Direction.DOWN)) {
+            System.err.println("user Cant go down when at bottom floor");
+            return;
+        }
+
+        if (floor == MAX_FLOOR && direction.equals(Direction.UP)) {
+            System.err.println("user Cant go up when at top floor");
+            return;
+        }
+
         Optional<Elevator> elevator = Arrays.stream(elevators)
                 .filter(elevatorElement -> elevatorAvailable(elevatorElement, floor, direction))
                 .findFirst();
@@ -33,30 +49,43 @@ public class ElevatorService {
                 .orElseThrow(() -> new IllegalArgumentException("No elevators available"));
     }
 
+
+    /**
+     * The user in the elevator selects a floor
+     *
+     * @param elevator
+     * @param destinationFloor
+     */
+    public void selectFloor(Elevator elevator, int destinationFloor) {
+        elevator.getUsers().add(new User(destinationFloor));
+        System.out.println("User enters elevator " + elevator.getElevatorId());
+        moveToFloor(elevator, destinationFloor);
+    }
+
+
+    public void workTheElevators() {
+        Arrays.stream(elevators).forEach(elevator -> {
+            if (!elevator.getDirection().equals(Direction.STATIONARY)) {
+                movingElevator(elevator);
+            }
+        });
+    }
+
     /**
      * Move the elevator to the floor of a caller
+     *
      * @param elevator
      * @param floor
      */
-    public void moveToCallerFloor(Elevator elevator, int floor) {
+    private void moveToCallerFloor(Elevator elevator, int floor) {
         if (elevator.getDirection().equals(Direction.STATIONARY)) {
             moveToFloor(elevator, floor);
         }
     }
 
     /**
-     * The user in the elevator selects a floor
-     * @param elevator
-     * @param destinationFloor
-     */
-    public void selectFloor(Elevator elevator, int destinationFloor){
-        elevator.getUsers().add(new User(destinationFloor));
-        System.out.println("User enters elevator " + elevator.getElevatorId());
-        moveToFloor(elevator, destinationFloor);
-    }
-
-    /**
      * Set the direction and the destination floor of the elevator
+     *
      * @param elevator
      * @param destinationFloor
      */
@@ -67,48 +96,43 @@ public class ElevatorService {
         } else {
             elevator.setMoveToFloor(Math.min(destinationFloor, elevator.getMoveToFloor()));
         }
-        movingLoop(elevator);
     }
 
-    public Optional<Elevator> getElevator(int id){
+    public Optional<Elevator> getElevator(int id) {
         return Arrays.stream(elevators).filter(elevator -> elevator.getElevatorId() == id).findFirst();
     }
 
     /**
      * Move the elevator to the destination floor
+     *
      * @param elevator
      */
-    private void movingLoop(Elevator elevator) {
-        while (elevator.getMoveToFloor() != elevator.getCurrentPosition()) {
-            if (elevator.getDirection().equals(Direction.UP)) {
-                elevator.setCurrentPosition(elevator.getCurrentPosition() + 1);
-            } else if (elevator.getDirection().equals(Direction.DOWN)) {
-                elevator.setCurrentPosition(elevator.getCurrentPosition() - 1);
-            } else {
-                System.err.println("Elevator with direction is marked stationary");
-                break; // WRONG INPUT
-            }
-            try {
-                TimeUnit.SECONDS.sleep(MOVING_TIME);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            System.out.println("Elevator " + elevator.getElevatorId() + " is at floor " + elevator.getCurrentPosition());
-            List<User> users = elevator.getUsers().stream().filter(user -> user.getDestinationFloor() == elevator.getCurrentPosition()).collect(Collectors.toList());
-            if(!users.isEmpty()){
-                elevator.getUsers().removeAll(users);
-                System.out.println(users.size() + " users left the elevator, currently " + elevator.getUsers().size() + " users in the elevator");
-            }
+    private void movingElevator(Elevator elevator) {
 
+        if (elevator.getDirection().equals(Direction.UP)) {
+            elevator.setCurrentPosition(elevator.getCurrentPosition() + 1);
+        } else if (elevator.getDirection().equals(Direction.DOWN)) {
+            elevator.setCurrentPosition(elevator.getCurrentPosition() - 1);
         }
-        elevator.setDirection(Direction.STATIONARY);
+
+        System.out.println("Elevator " + elevator.getElevatorId() + " is at floor " + elevator.getCurrentPosition());
+        List<User> users = elevator.getUsers().stream().filter(user -> user.getDestinationFloor() == elevator.getCurrentPosition()).collect(Collectors.toList());
+        if (!users.isEmpty()) {
+            elevator.getUsers().removeAll(users);
+            System.out.println(users.size() + " users left the elevator, currently " + elevator.getUsers().size() + " users in the elevator");
+        }
+
+        if (elevator.getMoveToFloor() == elevator.getCurrentPosition()) {
+            elevator.setDirection(Direction.STATIONARY);
+        }
     }
 
     /**
      * Find and elevator stationary or going the same way
+     *
      * @param elevatorElement the elevator we are inspection
-     * @param floor floor the user called the elevator at
-     * @param direction direction the user wants to go
+     * @param floor           floor the user called the elevator at
+     * @param direction       direction the user wants to go
      * @return true if the elevator is passing by the user and going the same way or is stationary, false otherwise
      */
     private boolean elevatorAvailable(Elevator elevatorElement, int floor, Direction direction) {
@@ -126,6 +150,7 @@ public class ElevatorService {
             return direction.equals(Direction.UP) && floor < elevatorElement.getMoveToFloor();
         }
     }
+
 
 
 }
