@@ -15,7 +15,11 @@ public class ElevatorService {
 
     private final int MAX_FLOOR = 50;
 
-    Elevator[] elevators = new Elevator[]{new Elevator(0, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>())};
+    Elevator[] elevators = new Elevator[]{
+            new Elevator(0, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>()),
+            new Elevator(1, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>()),
+            new Elevator(2, Direction.STATIONARY, 0, 0, 0, false, new ArrayList<>()),
+    };
 
     List<ElevatorCall> waitingUsers = new ArrayList<>();
 
@@ -109,7 +113,7 @@ public class ElevatorService {
             elevator.setCurrentPosition(elevator.getCurrentPosition() - 1);
         }
         /* FIND USERS LEAVING AT THIS FLOOR*/
-        System.out.println("Elevator " + elevator.getElevatorId() + " is at floor " + elevator.getCurrentPosition());
+        System.out.println("Elevator " + elevator.getElevatorId() + " is at floor " + elevator.getCurrentPosition() + " going to " + elevator.getMoveToFloor());
         List<User> users = elevator.getUsers().stream().filter(user -> user.getDestinationFloor() == elevator.getCurrentPosition()).collect(Collectors.toList());
         if (!users.isEmpty()) {
             elevator.getUsers().removeAll(users);
@@ -144,7 +148,7 @@ public class ElevatorService {
      * @return true if the elevator is passing by the user and going the same way or is stationary, false otherwise
      */
     private boolean elevatorAvailable(Elevator elevatorElement, int floor, Direction direction) {
-        if (elevatorElement.getDirection().equals(Direction.STATIONARY)) {
+        if (elevatorElement.getDirection().equals(Direction.STATIONARY) || elevatorElement.getMoveToFloor() == floor) {
             return true;
         }
 
