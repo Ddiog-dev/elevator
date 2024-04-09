@@ -126,7 +126,7 @@ public class ElevatorService {
         }
 
         /* IF WE REACH DIRECTION FLOOR, ELEVATOR IS STATIONARY */
-        if (elevator.getMoveToFloor() == elevator.getCurrentPosition()) {
+        if (elevator.getMoveToFloor() == elevator.getCurrentPosition() && !elevator.isWaitingForFloorInput()) {
             elevator.setDirection(Direction.STATIONARY);
             waitingUsers.stream().findFirst().map(elevatorCall -> {
                 moveToFloor(elevator, elevatorCall.getFloor());
