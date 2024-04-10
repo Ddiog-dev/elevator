@@ -4,6 +4,7 @@ import be.alexis.elevator.models.Direction;
 import be.alexis.elevator.models.Elevator;
 import be.alexis.elevator.models.ElevatorCall;
 import be.alexis.elevator.models.User;
+import lombok.Getter;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -15,12 +16,14 @@ public class ElevatorService {
 
     private final int MAX_FLOOR = 50;
 
+    @Getter
     Elevator[] elevators = new Elevator[]{
             new Elevator(0, Direction.STATIONARY, 0, 0, 0, false, false, new ArrayList<>()),
-//            new Elevator(1, Direction.STATIONARY, 0, 0, 0, false,false, new ArrayList<>()),
-//            new Elevator(2, Direction.STATIONARY, 0, 0, 0, false, false, new ArrayList<>()),
+            new Elevator(1, Direction.STATIONARY, 0, 0, 0, false,false, new ArrayList<>()),
+            new Elevator(2, Direction.STATIONARY, 0, 0, 0, false, false, new ArrayList<>()),
     };
 
+    @Getter
     List<ElevatorCall> waitingUsers = new ArrayList<>();
 
     /**
@@ -156,8 +159,11 @@ public class ElevatorService {
         if (elevator.getMoveToFloor() == elevator.getCurrentPosition() && !elevator.isWaitingForFloorInput()) {
             elevator.setDirection(Direction.STATIONARY);
             elevator.setInPriority(false);
+
             waitingUsers.stream().findFirst().map(elevatorCall -> {
-                moveToFloor(elevator, elevatorCall.getFloor(), false);
+                if(!isElevatorOnTheWay(elevatorCall)){
+                    moveToFloor(elevator, elevatorCall.getFloor(), false);
+                }
                 return true;
             });
         }
@@ -189,6 +195,10 @@ public class ElevatorService {
             return elevatorElement.getDirection().equals(direction); // elevator is called at its floor and going the same way
         }
 
-        return floorDifference > 0 ? (direction.equals(Direction.UP)) : direction.equals(Direction.DOWN);
+        return floorDifference > 0 ? (direction.equals(Direction.UP) && elevatorElement.getDirection().equals(Direction.UP)) : (direction.equals(Direction.DOWN) && elevatorElement.getDirection().equals(Direction.DOWN));
+    }
+
+    private boolean isElevatorOnTheWay(ElevatorCall waitingUser){
+        return Arrays.stream(elevators).anyMatch(elevator -> elevator.getMoveToFloor() == waitingUser.getFloor());
     }
 }

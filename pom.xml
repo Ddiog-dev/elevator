@@ -16,6 +16,7 @@
     <properties>
         <java.version>11</java.version>
         <springdoc-openapi.version>1.6.15</springdoc-openapi.version>
+        <spock.version>2.4-M1-groovy-4.0</spock.version>
     </properties>
     <dependencies>
         <dependency>
@@ -51,8 +52,22 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-    </dependencies>
 
+        <!-- SPOCK -->
+        <dependency>
+            <groupId>org.spockframework</groupId>
+            <artifactId>spock-core</artifactId>
+            <version>${spock.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.spockframework</groupId>
+            <artifactId>spock-spring</artifactId>
+            <version>${spock.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 
     <build>
         <plugins>
